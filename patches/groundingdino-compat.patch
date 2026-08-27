@@ -1,0 +1,63 @@
+diff --git a/groundingdino/models/GroundingDINO/bertwarper.py b/groundingdino/models/GroundingDINO/bertwarper.py
+index f490c4b..11cea37 100644
+--- a/groundingdino/models/GroundingDINO/bertwarper.py
++++ b/groundingdino/models/GroundingDINO/bertwarper.py
+@@ -26,7 +26,11 @@ class BertModelWarper(nn.Module):
+ 
+         self.get_extended_attention_mask = bert_model.get_extended_attention_mask
+         self.invert_attention_mask = bert_model.invert_attention_mask
+-        self.get_head_mask = bert_model.get_head_mask
++
++    def get_head_mask(self, head_mask, num_hidden_layers, is_attention_chunked=False):
++        if head_mask is not None:
++            return [None] * num_hidden_layers
++        return [None] * num_hidden_layers
+ 
+     def forward(
+         self,
+@@ -107,7 +111,7 @@ class BertModelWarper(nn.Module):
+         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+         # ourselves in which case we just need to make it broadcastable to all heads.
+         extended_attention_mask: torch.Tensor = self.get_extended_attention_mask(
+-            attention_mask, input_shape, device
++            attention_mask, input_shape, dtype=self.embeddings.word_embeddings.weight.dtype
+         )
+ 
+         # If a 2D or 3D attention mask is provided for the cross-attention
+diff --git a/groundingdino/models/GroundingDINO/ms_deform_attn.py b/groundingdino/models/GroundingDINO/ms_deform_attn.py
+index 489d501..bf137fa 100644
+--- a/groundingdino/models/GroundingDINO/ms_deform_attn.py
++++ b/groundingdino/models/GroundingDINO/ms_deform_attn.py
+@@ -327,29 +327,9 @@ class MultiScaleDeformableAttention(nn.Module):
+                 )
+             )
+     
+-        if torch.cuda.is_available() and value.is_cuda:
+-            halffloat = False
+-            if value.dtype == torch.float16:
+-                halffloat = True
+-                value = value.float()
+-                sampling_locations = sampling_locations.float()
+-                attention_weights = attention_weights.float()
+-
+-            output = MultiScaleDeformableAttnFunction.apply(
+-                value,
+-                spatial_shapes,
+-                level_start_index,
+-                sampling_locations,
+-                attention_weights,
+-                self.im2col_step,
+-            )
+-
+-            if halffloat:
+-                output = output.half()
+-        else:
+-            output = multi_scale_deformable_attn_pytorch(
+-                value, spatial_shapes, sampling_locations, attention_weights
+-            )
++        output = multi_scale_deformable_attn_pytorch(
++            value, spatial_shapes, sampling_locations, attention_weights
++        )
+ 
+         output = self.output_proj(output)
+ 

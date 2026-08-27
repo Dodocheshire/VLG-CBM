@@ -101,6 +101,8 @@ def train_cbm_and_save(args):
                 label_dir=args.annotation_dir,
                 use_allones=args.allones_concept,
                 seed=args.seed,
+                train_dataset_name=args.train_dataset,
+                train_annotation_suffix=args.train_annotation_suffix,
             )
 
             # save concept counts
@@ -136,6 +138,8 @@ def train_cbm_and_save(args):
         label_dir=args.annotation_dir,
         use_allones=args.allones_concept,
         seed=args.seed,
+        train_dataset_name=args.train_dataset,
+        train_annotation_suffix=args.train_annotation_suffix,
     )
     train_cbl_loader = get_concept_dataloader(
         args.dataset,
@@ -151,6 +155,8 @@ def train_cbm_and_save(args):
         label_dir=args.annotation_dir,
         use_allones=args.allones_concept,
         seed=args.seed,
+        train_dataset_name=args.train_dataset,
+        train_annotation_suffix=args.train_annotation_suffix,
     )  # no shuffle to match labels
     val_cbl_loader = get_concept_dataloader(
         args.dataset,
@@ -166,6 +172,8 @@ def train_cbm_and_save(args):
         label_dir=args.annotation_dir,
         use_allones=args.allones_concept,
         seed=args.seed,
+        train_dataset_name=args.train_dataset,
+        train_annotation_suffix=args.train_annotation_suffix,
     )
     test_cbl_loader = get_concept_dataloader(
         args.dataset,
@@ -363,6 +371,18 @@ def main():
 
     parser = argparse.ArgumentParser(description="Settings for creating CBM")
     parser.add_argument("--dataset", type=str, default="cifar10")
+    parser.add_argument(
+        "--train_dataset",
+        type=str,
+        default=None,
+        help="Optional manifest-backed dataset used for CBL/final-layer training",
+    )
+    parser.add_argument(
+        "--train_annotation_suffix",
+        type=str,
+        default=None,
+        help="Annotation suffix for the optional training dataset",
+    )
     parser.add_argument(
         "--concept_set", type=str, default=None, help="path to concept set name"
     )

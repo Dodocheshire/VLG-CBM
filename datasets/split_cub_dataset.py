@@ -43,7 +43,7 @@ for image_line,split_line in zip(images_lines,split_lines):
   if len(image.shape) == 3:
 
     # If test image
-    if(int(split_line[1]) is 0):
+    if int(split_line[1]) == 0:
       copyfile(images_path+image_line[1],test_folder+image_line[1])
       test_images += 1 
     else:

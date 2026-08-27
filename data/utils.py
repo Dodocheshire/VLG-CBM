@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from matplotlib import pyplot as plt
@@ -12,6 +13,59 @@ import data.data_lp as data_lp
 import clip
 from PIL import Image
 
+
+class ManifestImageDataset(torch.utils.data.Dataset):
+    """Image dataset backed by a ``relative_path<TAB>class_index`` manifest."""
+
+    def __init__(self, manifest_path: str, transform=None):
+        self.manifest_path = os.path.abspath(manifest_path)
+        self.transform = transform
+        metadata_path = os.path.splitext(self.manifest_path)[0] + ".json"
+        if not os.path.exists(metadata_path):
+            raise FileNotFoundError(f"Missing manifest metadata: {metadata_path}")
+
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+        source_root = metadata["source_root"]
+        if not os.path.isabs(source_root):
+            source_root = os.path.join(os.path.dirname(metadata_path), source_root)
+        self.root = os.path.abspath(source_root)
+
+        samples = []
+        with open(self.manifest_path, "r") as f:
+            for line_number, line in enumerate(f, start=1):
+                line = line.rstrip("\n")
+                if not line:
+                    continue
+                try:
+                    relative_path, target = line.rsplit("\t", 1)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"Malformed row {line_number} in {self.manifest_path}"
+                    ) from exc
+                samples.append((os.path.join(self.root, relative_path), int(target)))
+
+        expected_size = metadata.get("sample_count")
+        if expected_size is not None and len(samples) != expected_size:
+            raise ValueError(
+                f"Manifest has {len(samples)} samples, metadata expects {expected_size}"
+            )
+        self.samples = samples
+        self.imgs = samples
+        self.targets = [target for _, target in samples]
+        self.classes = metadata.get("classes", [])
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, index):
+        path, target = self.samples[index]
+        with Image.open(path) as image:
+            image = image.convert("RGB")
+        if self.transform is not None:
+            image = self.transform(image)
+        return image, target
+
 # get from the environment variable
 DATASET_FOLDER = os.environ.get("DATASET_FOLDER", "datasets")
 
@@ -23,7 +77,7 @@ DATASET_ROOTS = {
 }
 
 LABEL_FILES = {
-    "places365": "concept_files/categories_places365_clean.txt",
+    "places365": "concept_files/places365_classes.txt",
     "imagenet": "concept_files/imagenet_classes.txt",
     "cifar10": "concept_files/cifar10_classes.txt",
     "cifar100": "concept_files/cifar100_classes.txt",
@@ -60,7 +114,11 @@ def get_resnet_imagenet_preprocess():
 
 
 def get_data(dataset_name, preprocess=None):
-    if dataset_name == "cifar100_train":
+    subset_manifest = Path(DATASET_FOLDER) / "subsets" / f"{dataset_name}.tsv"
+    if subset_manifest.exists():
+        data = ManifestImageDataset(str(subset_manifest), transform=preprocess)
+
+    elif dataset_name == "cifar100_train":
         data = datasets.CIFAR100(
             root=os.path.expanduser(DATASET_FOLDER),
             download=True,

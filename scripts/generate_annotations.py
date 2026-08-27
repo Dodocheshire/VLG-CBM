@@ -316,6 +316,9 @@ def main():
             pin_memory=True,
         )
         print(f"Number of images in class {class_name}: {len(dataset_subset)}")
+        if len(dataset_subset) > 0 and all(os.path.exists(os.path.join(output_dir, f"{idx}.json")) for idx in dataset_subset.indices):
+            print(f"All images in class {class_name} ({class_idx}) already annotated. Skipping...")
+            continue
 
         # run model
         for batch_idx, (images, _) in enumerate(tqdm(dataloader)):

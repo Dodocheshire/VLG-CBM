@@ -33,6 +33,9 @@ class ConceptDataset(Dataset):
     ):
         self.torch_dataset = torch_dataset
         self.concepts = concepts
+        self.concept_to_idx = {
+            format_concept(concept): idx for idx, concept in enumerate(concepts or [])
+        }
         self.dir = f"{label_dir}/{dataset_name}_{split_suffix}"
         self.confidence_threshold = confidence_threshold
         self.preprocess = preprocess
@@ -70,10 +73,17 @@ class ConceptDataset(Dataset):
 
         # get mapping of concepts to a random bounding box containing the concept
         concept_bbx_map = []
-        for concept_idx, concept in enumerate(self.concepts):
-            _, matched_bbxs = self._find_in_list(concept, bbxs)
-            if len(matched_bbxs) > 0:
-                concept_bbx_map.append((concept_idx, matched_bbxs[np.random.randint(0, len(matched_bbxs))]))
+        bbxs_by_label = {}
+        for bbx in bbxs:
+            if bbx["label"] in self.concept_to_idx:
+                bbxs_by_label.setdefault(bbx["label"], []).append(bbx)
+        for label, matched_bbxs in bbxs_by_label.items():
+            concept_bbx_map.append(
+                (
+                    self.concept_to_idx[label],
+                    matched_bbxs[np.random.randint(0, len(matched_bbxs))],
+                )
+            )
 
         # get one hot vector of concepts
         concept_one_hot = torch.zeros(len(self.concepts), dtype=torch.float)
@@ -89,13 +99,10 @@ class ConceptDataset(Dataset):
                     continue
                 else:
                     iou = utils.get_bbox_iou(random_bbx["box"], bbx["box"])
-                    try:
-                        if iou > self.overlap_iou_threshold:
-                            concept_idx = self.concepts.index(bbx["label"])
-                            concept_one_hot[concept_idx] = 1.0
-                            # logger.debug(f"Marking {bbx['concept']} as 1 due to overlap with {random_bbx['concept']}")
-                    except ValueError:
-                        continue
+                    concept_idx = self.concept_to_idx.get(bbx["label"])
+                    if iou > self.overlap_iou_threshold and concept_idx is not None:
+                        concept_one_hot[concept_idx] = 1.0
+                        # logger.debug(f"Marking {bbx['concept']} as 1 due to overlap with {random_bbx['concept']}")
 
         # preprocess image
         if self.preprocess:
@@ -116,8 +123,11 @@ class ConceptDataset(Dataset):
             bbx["label"] = format_concept(bbx["label"])
 
         # get one hot vector of concepts
-        concept_one_hot = [1 if self._find_in_list(concept, bbxs)[0] else 0 for concept in self.concepts]
-        concept_one_hot = torch.tensor(concept_one_hot, dtype=torch.float)
+        concept_one_hot = torch.zeros(len(self.concepts), dtype=torch.float)
+        for bbx in bbxs:
+            concept_idx = self.concept_to_idx.get(bbx["label"])
+            if concept_idx is not None:
+                concept_one_hot[concept_idx] = 1.0
 
         # preprocess image
         if self.preprocess:
@@ -136,8 +146,11 @@ class ConceptDataset(Dataset):
             bbx["label"] = format_concept(bbx["label"])
 
         # get one hot vector of concepts
-        concept_one_hot = [1 if self._find_in_list(concept, bbxs)[0] else 0 for concept in self.concepts]
-        concept_one_hot = torch.tensor(concept_one_hot, dtype=torch.float)
+        concept_one_hot = torch.zeros(len(self.concepts), dtype=torch.float)
+        for bbx in bbxs:
+            concept_idx = self.concept_to_idx.get(bbx["label"])
+            if concept_idx is not None:
+                concept_one_hot[concept_idx] = 1.0
         return concept_one_hot
 
     def _find_in_list(self, concept: str, bbxs: List[Dict[str, Any]]) -> Tuple[bool, List[Dict[str, Any]]]:
@@ -202,7 +215,9 @@ def get_concept_dataloader(
     label_dir="outputs",
     use_allones=False,
     seed: int = 42,
-    concept_only=False
+    concept_only=False,
+    train_dataset_name: Optional[str] = None,
+    train_annotation_suffix: Optional[str] = None,
 ):
     dataset = ConceptDataset if not use_allones else partial(AllOneConceptDataset, get_classes(dataset_name))
     if split == "test":
@@ -220,11 +235,19 @@ def get_concept_dataloader(
         logger.info(f"Test dataset size: {len(dataset)}")
     else:
         assert val_split is not None
+        if train_dataset_name is None:
+            train_split_name = f"{dataset_name}_val" if dataset_name in ["places365", "imagenet"] else f"{dataset_name}_train"
+            split_suffix = "val" if dataset_name in ["places365", "imagenet"] else "train"
+        else:
+            train_split_name = train_dataset_name
+            if train_annotation_suffix is None:
+                raise ValueError("train_annotation_suffix is required with train_dataset_name")
+            split_suffix = train_annotation_suffix
         dataset = dataset(
             dataset_name,
-            data_utils.get_data(f"{dataset_name}_train", None),
+            data_utils.get_data(train_split_name, None),
             concepts,
-            split_suffix="train",
+            split_suffix=split_suffix,
             preprocess=preprocess,
             confidence_threshold=confidence_threshold,
             crop_to_concept_prob=crop_to_concept_prob,
@@ -261,6 +284,8 @@ def get_filtered_concepts_and_counts(
     label_dir="outputs",
     use_allones: bool = False,
     seed: int = 42,
+    train_dataset_name: Optional[str] = None,
+    train_annotation_suffix: Optional[str] = None,
 ):
     # remove concepts that are not present in the dataset
     dataloader = get_concept_dataloader(
@@ -277,7 +302,9 @@ def get_filtered_concepts_and_counts(
         label_dir=label_dir,
         use_allones=use_allones,
         seed=seed,
-        concept_only=True
+        concept_only=True,
+        train_dataset_name=train_dataset_name,
+        train_annotation_suffix=train_annotation_suffix,
     )
     # get concept counts
     raw_concepts_count = torch.zeros(len(raw_concepts))

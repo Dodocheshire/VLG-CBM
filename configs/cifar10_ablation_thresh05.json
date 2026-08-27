@@ -1,6 +1,6 @@
 {
-    "dataset": "cifar100",
-    "concept_set": "concept_files/cifar100_filtered.txt",
+    "dataset": "cifar10",
+    "concept_set": "concept_files/cifar10_filtered.txt",
     "filter_set": null,
     "val_split": 0.1,
     "backbone": "clip_RN50",
@@ -8,14 +8,14 @@
     "use_clip_penultimate": true,
     "skip_concept_filter": false,
     "annotation_dir": "./annotations",
-    "save_dir": "experiment_results/checkpoints/cifar100",
+    "save_dir": "experiment_results/ablations/threshold_05",
     "load_dir": null,
     "device": "cuda:1",
-    "num_workers": 6,
+    "num_workers": 4,
     "allones_concept": false,
     "crop_to_concept_prob": 0.0,
-    "cbl_confidence_threshold": 0.15,
-    "cbl_hidden_layers": 1,
+    "cbl_confidence_threshold": 0.05,
+    "cbl_hidden_layers": 0,
     "cbl_batch_size": 32,
     "cbl_epochs": 40,
     "cbl_weight_decay": 1e-05,
@@ -28,4 +28,4 @@
     "saga_n_iters": 2000,
     "seed": 28527,
     "cbl_optimizer": "adam"
-  }
+}

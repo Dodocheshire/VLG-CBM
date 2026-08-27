@@ -1,0 +1,50 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Local datasets and generated subset manifests
+datasets/CUB/
+datasets/cifar-10-batches-py/
+datasets/cifar-100-python/
+datasets/imagenet/
+datasets/places365_torch/
+datasets/subsets/
+datasets/attributes.txt
+
+# Generated annotations, checkpoints, and reports
+annotations/
+experiment_results/
+saved_models/
+wandb/
+runs/
+*.log
+*.pid
+*.pt
+*.pth
+*.ckpt
+
+# Externally reconstructed model dependencies
+GroundingDINO/
+bert-base-uncased/
+
+# Dataset preparation artifact
+scripts/valprep.sh
+
+# Archives and editor/OS files
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+.DS_Store
+.idea/
+.vscode/
